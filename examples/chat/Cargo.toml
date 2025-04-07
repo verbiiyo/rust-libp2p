@@ -12,6 +12,7 @@ libp2p = { git = "https://github.com/verbiiyo/rust-libp2p.git", default-features
 libp2p-webrtc-websys = { git = "https://github.com/verbiiyo/rust-libp2p.git", package = "libp2p-webrtc-websys" }
 
 wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
 wasm-bindgen-futures = "0.4"
 futures = "0.3"
 tracing-wasm = "0.2"

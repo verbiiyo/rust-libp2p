@@ -37,6 +37,8 @@ use once_cell::sync::Lazy;
 static MSG_TX: Lazy<Mutex<Option<UnboundedSender<String>>>> = Lazy::new(|| Mutex::new(None));
 
 async fn run() -> Result<(), JsError> {
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+
     tracing_wasm::set_as_global_default();
     let body = Body::from_current_window()?;
 
@@ -79,20 +81,22 @@ async fn run() -> Result<(), JsError> {
     let topic_hash = topic.hash();
     spawn_local(async move {
         while let Some(msg) = rx.next().await {
-            let mesh_peers_exist = {
-                let swarm_ref = tx_swarm.borrow();
-                swarm_ref.behaviour().mesh_peers(&topic_hash).count() > 0
+            let publish_result = {
+                let swarm = &mut *tx_swarm.borrow_mut();
+                swarm.behaviour_mut().publish(topic.clone(), msg.as_bytes())
             };
-
-            if mesh_peers_exist {
-                if let Err(e) = tx_swarm.borrow_mut().behaviour_mut().publish(topic.clone(), msg.as_bytes()) {
-                    web_sys::console::error_1(&format!("❌ Publish error: {:?}", e).into());
+    
+            match publish_result {
+                Ok(_) => {
+                    web_sys::console::log_1(&"✅ Message published".into());
                 }
-            } else {
-                web_sys::console::log_1(&"⚠️ No peers to publish to.".into());
+                Err(err) => {
+                    web_sys::console::error_1(&format!("❌ Publish failed: {:?}", err).into());
+                }
             }
         }
     });
+    
 
     let swarm_ref = swarm.clone();
     loop {
