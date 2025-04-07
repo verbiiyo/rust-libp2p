@@ -53,6 +53,9 @@ async fn run() -> Result<(), JsError> {
         .build()
         .map_err(|e| JsError::new(&format!("config error: {:?}", e)))?;
 
+    let (tx, mut rx): (UnboundedSender<String>, UnboundedReceiver<String>) = unbounded();
+    *MSG_TX.lock().unwrap() = Some(tx);
+
     let mut swarm = libp2p::SwarmBuilder::with_new_identity()
         .with_wasm_bindgen()
         .with_other_transport(|key| {
@@ -69,16 +72,17 @@ async fn run() -> Result<(), JsError> {
 
     swarm.behaviour_mut().subscribe(&topic)?;
 
-    let (tx, mut rx): (UnboundedSender<String>, UnboundedReceiver<String>) = unbounded();
-    *MSG_TX.lock().unwrap() = Some(tx);
+    let mut swarm_for_main = swarm;
+    let mut swarm_for_tx = swarm_for_main.clone();
+    let topic_clone = topic.clone();
 
-    let tx_topic = topic.clone();
-    let tx_swarm = &mut swarm;
     spawn_local(async move {
         while let Some(msg) = rx.next().await {
-            let _ = tx_swarm.behaviour_mut().publish(tx_topic.clone(), msg.as_bytes());
+            let _ = swarm_for_tx.behaviour_mut().publish(topic_clone.clone(), msg.as_bytes());
         }
     });
+
+    let mut swarm = swarm_for_main;
 
     loop {
         match swarm.next().await.unwrap() {
