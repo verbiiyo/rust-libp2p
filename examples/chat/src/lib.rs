@@ -1,3 +1,6 @@
+//! Minimal Gossipsub P2P Chat - Rust WASM (browser-only)
+
+// lib.rs
 #![cfg(target_arch = "wasm32")]
 
 use std::collections::hash_map::DefaultHasher;
@@ -48,7 +51,7 @@ async fn run() -> Result<(), JsError> {
         .validation_mode(gossipsub::ValidationMode::Strict)
         .message_id_fn(message_id_fn)
         .build()
-        .map_err(js_error)?;
+        .map_err(|e| JsError::new(&format!("config error: {:?}", e)))?;
 
     let mut swarm = libp2p::SwarmBuilder::with_new_identity()
         .with_wasm_bindgen()
@@ -69,7 +72,6 @@ async fn run() -> Result<(), JsError> {
     let (tx, mut rx): (UnboundedSender<String>, UnboundedReceiver<String>) = unbounded();
     *MSG_TX.lock().unwrap() = Some(tx);
 
-    // Broadcast loop (no clone)
     let tx_topic = topic.clone();
     let tx_swarm = &mut swarm;
     spawn_local(async move {
@@ -78,7 +80,6 @@ async fn run() -> Result<(), JsError> {
         }
     });
 
-    // Render loop
     loop {
         match swarm.next().await.unwrap() {
             SwarmEvent::Behaviour(gossipsub::Event::Message { message, .. }) => {
@@ -104,13 +105,9 @@ impl Body {
     }
 
     fn append_p(&self, msg: &str) -> Result<(), JsError> {
-        let val = self.document.create_element("p").map_err(js_error)?;
+        let val = self.document.create_element("p").map_err(|e| JsError::new(&format!("{:?}", e)))?;
         val.set_text_content(Some(msg));
-        self.body.append_child(&val).map_err(js_error)?;
+        self.body.append_child(&val).map_err(|e| JsError::new(&format!("{:?}", e)))?;
         Ok(())
     }
-}
-
-fn js_error<T: ToString>(msg: T) -> JsError {
-    JsError::new(&msg.to_string())
 }
