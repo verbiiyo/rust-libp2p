@@ -22,7 +22,8 @@ pub fn start() {
     });
 }
 
-#[wasm_bindgen]\pub fn send_message(msg: String) {
+#[wasm_bindgen]
+pub fn send_message(msg: String) {
     if let Some(tx) = MSG_TX.lock().unwrap().as_ref() {
         let _ = tx.unbounded_send(msg);
     }
