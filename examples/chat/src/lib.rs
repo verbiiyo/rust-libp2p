@@ -59,7 +59,7 @@ async fn run() -> Result<(), JsError> {
             Ok(webrtc_websys::Transport::new(webrtc_websys::Config::new(&key)))
         })?
         .with_behaviour(|key| {
-            let gs = gossipsub::Behaviour::new(
+            let gs = gossipsub::Behaviour::<gossipsub::IdentityTransform, gossipsub::AllowAllSubscriptionFilter>::new(
                 gossipsub::MessageAuthenticity::Signed(key.clone()),
                 config,
             )?;
