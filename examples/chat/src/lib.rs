@@ -18,6 +18,7 @@ use web_sys::{Document, HtmlElement};
 
 #[wasm_bindgen(start)]
 pub fn start() {
+    console_error_panic_hook::set_once();
     spawn_local(async {
         run().await.expect("run failed");
     });
@@ -37,8 +38,6 @@ use once_cell::sync::Lazy;
 static MSG_TX: Lazy<Mutex<Option<UnboundedSender<String>>>> = Lazy::new(|| Mutex::new(None));
 
 async fn run() -> Result<(), JsError> {
-    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-
     tracing_wasm::set_as_global_default();
     let body = Body::from_current_window()?;
 
@@ -79,24 +78,30 @@ async fn run() -> Result<(), JsError> {
 
     let tx_swarm = swarm.clone();
     let topic_hash = topic.hash();
+    let topic_clone = topic.clone();
     spawn_local(async move {
         while let Some(msg) = rx.next().await {
-            let publish_result = {
-                let swarm = &mut *tx_swarm.borrow_mut();
-                swarm.behaviour_mut().publish(topic.clone(), msg.as_bytes())
+            let mesh_peers_exist = {
+                let swarm_ref = tx_swarm.borrow();
+                swarm_ref.behaviour().mesh_peers(&topic_hash).count() > 0
             };
-    
-            match publish_result {
-                Ok(_) => {
+
+            if mesh_peers_exist {
+                let publish_result = {
+                    let mut swarm_ref = tx_swarm.borrow_mut();
+                    swarm_ref.behaviour_mut().publish(topic_clone.clone(), msg.as_bytes())
+                };
+
+                if let Err(err) = publish_result {
+                    web_sys::console::error_1(&format!("❌ Publish failed: {:?}", err).into());
+                } else {
                     web_sys::console::log_1(&"✅ Message published".into());
                 }
-                Err(err) => {
-                    web_sys::console::error_1(&format!("❌ Publish failed: {:?}", err).into());
-                }
+            } else {
+                web_sys::console::log_1(&"⚠️ No peers to publish to.".into());
             }
         }
     });
-    
 
     let swarm_ref = swarm.clone();
     loop {
