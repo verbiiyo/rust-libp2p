@@ -1,27 +1,21 @@
 [package]
 name = "chat-example"
 version = "0.1.0"
-edition.workspace = true
-publish = false
+edition = "2021"
 license = "MIT"
-
-[package.metadata.release]
-release = false
-
-[dependencies]
-futures = "0.3"
-wasm-bindgen = "0.2"
-wasm-bindgen-futures = "0.4"
-js-sys = "0.3"
-web-sys = { version = "0.3", features = ["Document", "HtmlElement", "Window", "Node"] }
-tracing-wasm = "0.2"
-once_cell = "1.19"
-libp2p = { path = "../../libp2p", default-features = false, features = ["gossipsub", "wasm-bindgen"] }
-libp2p-webrtc-websys = { version = "0.4.0" }
-getrandom = { version = "0.2", features = ["js"] }
-
-[lints]
-workspace = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libp2p = { git = "https://github.com/verbiiyo/rust-libp2p.git", default-features = false, features = ["gossipsub", "wasm-bindgen"] }
+libp2p-webrtc-websys = { git = "https://github.com/verbiiyo/rust-libp2p.git", package = "libp2p-webrtc-websys" }
+
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+futures = "0.3"
+tracing-wasm = "0.2"
+once_cell = "1.19"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["Document", "HtmlElement", "Node", "Window"] }
+getrandom = { version = "0.2", features = ["js"] }
