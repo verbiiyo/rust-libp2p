@@ -6,7 +6,7 @@ import socketserver
 import websockets
 
 SIGNAL_PORT = 9001
-HTTP_PORT = 8000
+HTTP_PORT = 8080
 
 
 # --- WebSocket Signaling Server ---

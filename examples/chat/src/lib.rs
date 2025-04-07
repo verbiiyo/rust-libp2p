@@ -86,16 +86,13 @@ async fn run() -> Result<(), JsError> {
         }
     });
 
-    let mut swarm = Rc::try_unwrap(swarm).ok().unwrap().into_inner();
-
-
+    // Reuse the Rc<RefCell<Swarm>> safely inside loop
+    let swarm_ref = swarm.clone();
     loop {
-        match swarm.next().await.unwrap() {
-            SwarmEvent::Behaviour(gossipsub::Event::Message { message, .. }) => {
-                let text = String::from_utf8_lossy(&message.data);
-                body.append_p(&text)?;
-            }
-            _ => {}
+        let event = swarm_ref.borrow_mut().next().await;
+        if let Some(SwarmEvent::Behaviour(gossipsub::Event::Message { message, .. })) = event {
+            let text = String::from_utf8_lossy(&message.data);
+            body.append_p(&text)?;
         }
     }
 }
