@@ -14,7 +14,7 @@ use libp2p::{gossipsub, swarm::SwarmEvent, PeerId};
 use libp2p_webrtc_websys as webrtc_websys;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{Document, HtmlElement, console};
+use web_sys::{Document, HtmlElement};
 
 #[wasm_bindgen(start)]
 pub fn start() {
@@ -76,14 +76,18 @@ async fn run() -> Result<(), JsError> {
     swarm.borrow_mut().behaviour_mut().subscribe(&topic)?;
 
     let tx_swarm = swarm.clone();
-    let topic_clone = topic.hash();
+    let topic_hash = topic.hash();
     spawn_local(async move {
         while let Some(msg) = rx.next().await {
-            let peers = tx_swarm.borrow().behaviour().mesh_peers(&topic_clone);
-            if peers.count() > 0 {
+            let mesh_peers_exist = {
+                let swarm_ref = tx_swarm.borrow();
+                swarm_ref.behaviour().mesh_peers(&topic_hash).count() > 0
+            };
+
+            if mesh_peers_exist {
                 let _ = tx_swarm.borrow_mut().behaviour_mut().publish(topic.clone(), msg.as_bytes());
             } else {
-                console::log_1(&"⚠️ No peers to publish to.".into());
+                web_sys::console::log_1(&"⚠️ No peers to publish to.".into());
             }
         }
     });
@@ -94,10 +98,10 @@ async fn run() -> Result<(), JsError> {
         if let Some(event) = event {
             match event {
                 SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-                    console::log_1(&format!("✅ Connected to peer: {peer_id}").into());
+                    web_sys::console::log_1(&format!("✅ Connected to peer: {peer_id}").into());
                 }
                 SwarmEvent::ConnectionClosed { peer_id, .. } => {
-                    console::log_1(&format!("❌ Disconnected from peer: {peer_id}").into());
+                    web_sys::console::log_1(&format!("❌ Disconnected from peer: {peer_id}").into());
                 }
                 SwarmEvent::Behaviour(gossipsub::Event::Message { message, .. }) => {
                     let text = String::from_utf8_lossy(&message.data);
