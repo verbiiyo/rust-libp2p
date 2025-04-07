@@ -1,0 +1,18 @@
+<html>
+  <body>
+    <h1>📡 WASM Gossipsub</h1>
+    <input id="msg" type="text" placeholder="Type message..." />
+    <button onclick="send()">Send</button>
+    <script type="module">
+      import init, { send_message } from "./pkg/chat-example.js";
+
+      await init();
+
+      window.send = () => {
+        const input = document.getElementById("msg");
+        send_message(input.value);
+        input.value = "";
+      };
+    </script>
+  </body>
+</html>
