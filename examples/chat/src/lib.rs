@@ -6,6 +6,8 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use futures::StreamExt;
 use libp2p::{gossipsub, swarm::SwarmEvent};
@@ -56,7 +58,7 @@ async fn run() -> Result<(), JsError> {
     let (tx, mut rx): (UnboundedSender<String>, UnboundedReceiver<String>) = unbounded();
     *MSG_TX.lock().unwrap() = Some(tx);
 
-    let mut swarm = libp2p::SwarmBuilder::with_new_identity()
+    let swarm = libp2p::SwarmBuilder::with_new_identity()
         .with_wasm_bindgen()
         .with_other_transport(|key| {
             Ok(webrtc_websys::Transport::new(webrtc_websys::Config::new(&key)))
@@ -70,19 +72,22 @@ async fn run() -> Result<(), JsError> {
         })?
         .build();
 
-    swarm.behaviour_mut().subscribe(&topic)?;
+    let swarm = Rc::new(RefCell::new(swarm));
+    swarm.borrow_mut().behaviour_mut().subscribe(&topic)?;
 
-    let mut swarm_for_main = swarm;
-    let mut swarm_for_tx = swarm_for_main.clone();
+    let tx_swarm = swarm.clone();
     let topic_clone = topic.clone();
-
     spawn_local(async move {
         while let Some(msg) = rx.next().await {
-            let _ = swarm_for_tx.behaviour_mut().publish(topic_clone.clone(), msg.as_bytes());
+            let _ = tx_swarm
+                .borrow_mut()
+                .behaviour_mut()
+                .publish(topic_clone.clone(), msg.as_bytes());
         }
     });
 
-    let mut swarm = swarm_for_main;
+    let mut swarm = Rc::try_unwrap(swarm).ok().unwrap().into_inner();
+
 
     loop {
         match swarm.next().await.unwrap() {
