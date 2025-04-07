@@ -85,7 +85,9 @@ async fn run() -> Result<(), JsError> {
             };
 
             if mesh_peers_exist {
-                let _ = tx_swarm.borrow_mut().behaviour_mut().publish(topic.clone(), msg.as_bytes());
+                if let Err(e) = tx_swarm.borrow_mut().behaviour_mut().publish(topic.clone(), msg.as_bytes()) {
+                    web_sys::console::error_1(&format!("❌ Publish error: {:?}", e).into());
+                }
             } else {
                 web_sys::console::log_1(&"⚠️ No peers to publish to.".into());
             }
