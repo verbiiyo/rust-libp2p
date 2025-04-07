@@ -1,16 +1,18 @@
+# server.py
 import asyncio
-import websockets
+import threading
 import http.server
 import socketserver
-import threading
+import websockets
 
-PORT = 8000
-SIGNAL_PORT = 8765
+SIGNAL_PORT = 9001
+HTTP_PORT = 8000
 
+
+# --- WebSocket Signaling Server ---
 peers = set()
 
-# --- WebSocket signaling server ---
-async def signaling(websocket):
+async def signaling(websocket, path):
     peers.add(websocket)
     try:
         async for msg in websocket:
@@ -20,19 +22,21 @@ async def signaling(websocket):
     finally:
         peers.remove(websocket)
 
-def start_signaling():
-    asyncio.set_event_loop(asyncio.new_event_loop())
-    start_server = websockets.serve(signaling, "localhost", SIGNAL_PORT)
-    asyncio.get_event_loop().run_until_complete(start_server)
-    asyncio.get_event_loop().run_forever()
+async def start_signaling():
+    async with websockets.serve(signaling, "localhost", SIGNAL_PORT):
+        print(f"🔌 Signaling server running on ws://localhost:{SIGNAL_PORT}")
+        await asyncio.Future()  # Run forever
 
-# --- Static file server (serves index.html + pkg/ etc) ---
+
+# --- Static File Server ---
 def start_static():
     handler = http.server.SimpleHTTPRequestHandler
-    with socketserver.TCPServer(("", PORT), handler) as httpd:
-        print(f"Serving at http://localhost:{PORT}")
+    with socketserver.TCPServer(("", HTTP_PORT), handler) as httpd:
+        print(f"📦 Static server running on http://localhost:{HTTP_PORT}")
         httpd.serve_forever()
 
-# --- Start both ---
-threading.Thread(target=start_signaling, daemon=True).start()
-start_static()
+
+# --- Entrypoint ---
+if __name__ == "__main__":
+    threading.Thread(target=start_static, daemon=True).start()
+    asyncio.run(start_signaling())
