@@ -10,11 +10,11 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 use futures::StreamExt;
-use libp2p::{gossipsub, swarm::SwarmEvent};
+use libp2p::{gossipsub, swarm::SwarmEvent, PeerId};
 use libp2p_webrtc_websys as webrtc_websys;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{Document, HtmlElement};
+use web_sys::{Document, HtmlElement, console};
 
 #[wasm_bindgen(start)]
 pub fn start() {
@@ -76,23 +76,35 @@ async fn run() -> Result<(), JsError> {
     swarm.borrow_mut().behaviour_mut().subscribe(&topic)?;
 
     let tx_swarm = swarm.clone();
-    let topic_clone = topic.clone();
+    let topic_clone = topic.hash();
     spawn_local(async move {
         while let Some(msg) = rx.next().await {
-            let _ = tx_swarm
-                .borrow_mut()
-                .behaviour_mut()
-                .publish(topic_clone.clone(), msg.as_bytes());
+            let peers = tx_swarm.borrow().behaviour().mesh_peers(&topic_clone);
+            if peers.count() > 0 {
+                let _ = tx_swarm.borrow_mut().behaviour_mut().publish(topic.clone(), msg.as_bytes());
+            } else {
+                console::log_1(&"⚠️ No peers to publish to.".into());
+            }
         }
     });
 
-    // Reuse the Rc<RefCell<Swarm>> safely inside loop
     let swarm_ref = swarm.clone();
     loop {
         let event = swarm_ref.borrow_mut().next().await;
-        if let Some(SwarmEvent::Behaviour(gossipsub::Event::Message { message, .. })) = event {
-            let text = String::from_utf8_lossy(&message.data);
-            body.append_p(&text)?;
+        if let Some(event) = event {
+            match event {
+                SwarmEvent::ConnectionEstablished { peer_id, .. } => {
+                    console::log_1(&format!("✅ Connected to peer: {peer_id}").into());
+                }
+                SwarmEvent::ConnectionClosed { peer_id, .. } => {
+                    console::log_1(&format!("❌ Disconnected from peer: {peer_id}").into());
+                }
+                SwarmEvent::Behaviour(gossipsub::Event::Message { message, .. }) => {
+                    let text = String::from_utf8_lossy(&message.data);
+                    body.append_p(&text)?;
+                }
+                _ => {}
+            }
         }
     }
 }
